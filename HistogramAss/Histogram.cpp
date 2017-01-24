@@ -2,24 +2,39 @@
 #include "device_launch_parameters.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "Histogram.h"
 
 int main()
 {
-	const int arraySize = 5;
-	const int a[arraySize] = { 1, 2, 3, 4, 5 };
-	const int b[arraySize] = { 10, 20, 30, 40, 50 };
-	int c[arraySize] = { 0 };
+	const int ARR_SIZE = 300000;
+	const int VALUES_RANGE = 256;
+	int* largeArr = (int*)malloc(ARR_SIZE * sizeof(int));
+	for (int i = 0; i < ARR_SIZE; i++)
+	{
+		largeArr[i] = 0;
+	}
+	long hist[VALUES_RANGE] = { 0 };
 
-	// Add vectors in parallel.
-	cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
+	srand(time(NULL));
+	for (long i = 0; i < ARR_SIZE; i++)
+		largeArr[i] = rand() % VALUES_RANGE;
+	//largeArr[i] = 1;
+
+
+
+	cudaError_t cudaStatus = histogramWithCuda(hist, largeArr, ARR_SIZE, VALUES_RANGE);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "addWithCuda failed!");
 		return 1;
 	}
 
-	printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-		c[0], c[1], c[2], c[3], c[4]);
+	printf("Histogram sample = {%d,%d,%d,%d,%d}\n",
+		hist[0], hist[1], hist[2], hist[3], hist[4]);
+
+	free(largeArr);
 
 	// cudaDeviceReset must be called before exiting in order for profiling and
 	// tracing tools such as Nsight and Visual Profiler to show complete traces.
