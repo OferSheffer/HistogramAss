@@ -1,14 +1,25 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
 #include "Histogram.h"
 
-int main()
+int main(int argc, char *argv[])
 {
+	int numprocs, myid;
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+	MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+
+	MPI_Status status;
+
+
+
+
 	const int ARR_SIZE = 300000;
 	const int VALUES_RANGE = 256;
 	int* largeArr = (int*)malloc(ARR_SIZE * sizeof(int));
@@ -44,5 +55,6 @@ int main()
 		return 1;
 	}
 
+	MPI_Finalize();
 	return 0;
 }
