@@ -2,6 +2,13 @@
 #include "device_launch_parameters.h"
 
 #include <stdio.h>
+#include <string>
+
+#define CHKMAL_ERROR	if (cudaStatus != cudaSuccess) { fprintf(stderr, "cudaMalloc failed!"); goto Error; }
+#define CHKMEMCPY_ERROR if (cudaStatus != cudaSuccess) { fprintf(stderr, "cudaMemcpy failed!"); goto Error; }
+#define CHKSYNC_ERROR	if (cudaStatus != cudaSuccess) { fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus); goto Error; }
+
+
 
 // 300,000 indices; 2,000 total threads; 2 blocks: 1,000 threads per block;
 // Each thread in charge of 150 contigeous indices
@@ -51,6 +58,7 @@ cudaError_t histogramWithCuda(long* hist, const int* largeArr, const int arrSize
 	int  *dev_threadedHist = 0;
 	cudaError_t cudaStatus;
 
+	// memory init block
 	{
 		cudaStatus = cudaSetDevice(0);
 		if (cudaStatus != cudaSuccess) {
@@ -59,37 +67,13 @@ cudaError_t histogramWithCuda(long* hist, const int* largeArr, const int arrSize
 		}
 
 		// Allocate GPU buffers
-		cudaStatus = cudaMalloc((void**)&dev_arr, arrSize * sizeof(int));
-		//errorTest(cudaStatus);
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaMalloc failed!");
-			goto Error;
-		}
-
-		cudaStatus = cudaMalloc((void**)&dev_hist, histSize * sizeof(long));
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaMalloc failed!");
-			goto Error;
-		}
-
-		cudaStatus = cudaMalloc((void**)&dev_threadedHist, THREADS_PER_BLOCK * NO_BLOCKS * histSize * sizeof(int));     // each thread gets a "private" 
-		if (cudaStatus != cudaSuccess) {																				// histogram on the threadedHist array
-			fprintf(stderr, "cudaMalloc failed!");
-			goto Error;
-		}
+		cudaStatus = cudaMalloc((void**)&dev_arr, arrSize * sizeof(int)); CHKMAL_ERROR;
+		cudaStatus = cudaMalloc((void**)&dev_hist, histSize * sizeof(long)); CHKMAL_ERROR;
+		cudaStatus = cudaMalloc((void**)&dev_threadedHist, THREADS_PER_BLOCK * NO_BLOCKS * histSize * sizeof(int)); CHKMAL_ERROR;    // each thread gets a "private" 
 
 		// Copy input / memSet (Host to Device)
-		cudaStatus = cudaMemcpy(dev_arr, largeArr, arrSize * sizeof(int), cudaMemcpyHostToDevice);  //TODO: how do I test cudaMemcpy?
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaMemcpy failed!");
-			goto Error;
-		}
-
-		cudaStatus = cudaMemcpy(dev_hist, hist, histSize * sizeof(int), cudaMemcpyHostToDevice);
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaMemcpy failed!");
-			goto Error;
-		}
+		cudaStatus = cudaMemcpy(dev_arr, largeArr, arrSize * sizeof(int), cudaMemcpyHostToDevice); CHKMEMCPY_ERROR;
+		cudaStatus = cudaMemcpy(dev_hist, hist, histSize * sizeof(int), cudaMemcpyHostToDevice); CHKMEMCPY_ERROR;
 
 		cudaStatus = cudaMemset((void*)dev_threadedHist, 0, THREADS_PER_BLOCK * NO_BLOCKS * histSize * sizeof(int));
 		if (cudaStatus != cudaSuccess) {
@@ -99,39 +83,27 @@ cudaError_t histogramWithCuda(long* hist, const int* largeArr, const int arrSize
 
 	}
 
+	// *** phase 1 ***
 	// Launch a kernel on the GPU with one thread for every THREAD_BLOCK_SIZE elements.
 	threadedHistKernel << <NO_BLOCKS, THREADS_PER_BLOCK >> >(dev_threadedHist, dev_arr, THREADS_PER_BLOCK, histSize, THREAD_BLOCK_SIZE);
-
-	cudaStatus = cudaDeviceSynchronize();
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-		goto Error;
-	}
-
-	sumThreadedResultsKernel << <1, histSize >> >(dev_hist, dev_threadedHist, histSize, THREADS_PER_BLOCK * NO_BLOCKS);
-
-
-	// Check for any errors launching the kernel
 	cudaStatus = cudaGetLastError();
 	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
+		fprintf(stderr, "threadedHistKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
 		goto Error;
 	}
+	cudaStatus = cudaDeviceSynchronize(); CHKSYNC_ERROR;
 
-	// cudaDeviceSynchronize waits for the kernel to finish, and returns
-	// any errors encountered during the launch.
-	cudaStatus = cudaDeviceSynchronize();
+	// *** phase 2 ***
+	sumThreadedResultsKernel << <1, histSize >> >(dev_hist, dev_threadedHist, histSize, THREADS_PER_BLOCK * NO_BLOCKS);
+	cudaStatus = cudaGetLastError();
 	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
+		fprintf(stderr, "sumThreadedResultsKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
 		goto Error;
 	}
+	cudaStatus = cudaDeviceSynchronize(); CHKSYNC_ERROR;
 
 	// Copy output vector from GPU buffer to host memory.
-	cudaStatus = cudaMemcpy(hist, dev_hist, histSize * sizeof(int), cudaMemcpyDeviceToHost);
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy failed!");
-		goto Error;
-	}
+	cudaStatus = cudaMemcpy(hist, dev_hist, histSize * sizeof(int), cudaMemcpyDeviceToHost); CHKMEMCPY_ERROR;
 
 Error:
 	cudaFree(dev_arr);
