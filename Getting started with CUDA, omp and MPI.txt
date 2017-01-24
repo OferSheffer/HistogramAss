@@ -1,0 +1,7 @@
+1. start a CUDA project
+2. solution properties, configuration: Patform: x64
+3. cpp file
+4. project properties, C/C++ -> Language: Open MP Support: Yes (/openmp)
+5. project properties, C/C++ General -> Additional include directories: "...MPICH2\include"
+-- C:\Program Files\MPICH2\include
+6. 
