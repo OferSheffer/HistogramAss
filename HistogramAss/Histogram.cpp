@@ -50,15 +50,11 @@ int main(int argc, char *argv[])
 	else  // *** SLAVE ***
 	{
 		// recv half the array to slave for calculations
-		int count;
-		MPI_Probe(MASTER, 0, MPI_COMM_WORLD, &status);
-		MPI_Get_count(&status, MPI_CHAR, &count);
-		myLargeArr = (int*)calloc(count, sizeof(int));
+		myLargeArr = (int*)calloc(MY_ARR_SIZE, sizeof(int));
 		MPI_Recv(myLargeArr, MY_ARR_SIZE, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
 	}
 
 	// use openMP for first half
-	// TODO apply same code in slave
 	int* ompHistogram = (int*)calloc(VALUES_RANGE, sizeof(int));
 	int* ompCounterArr = (int*)calloc(NO_OMP_THREADS * VALUES_RANGE, sizeof(int));   // each thread given pseudo-private VALUES_RANGE
 
@@ -86,6 +82,9 @@ int main(int argc, char *argv[])
 
 	printf("%d Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
 		hist[0], hist[1], hist[2], hist[3], hist[4]);
+
+
+	// aggregate local OMP & CUDA results
 
 
 
