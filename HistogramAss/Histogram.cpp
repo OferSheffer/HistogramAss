@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 		srand(time(NULL));
 		for (long i = 0; i < ARR_SIZE; i++)
 			largeArr[i] = rand() % VALUES_RANGE;
-		//largeArr[i] = 1;
+			//largeArr[i] = 1;
 		myLargeArr = largeArr;
 
 	
@@ -70,8 +70,8 @@ int main(int argc, char *argv[])
 		ompHistogram[0], ompHistogram[1], ompHistogram[2], ompHistogram[3], ompHistogram[4]);
 
 
-	// TODO use CUDA for second half
-	cudaError_t cudaStatus = histogramWithCuda(hist, myLargeArr, ARR_SIZE, VALUES_RANGE);
+	// use CUDA for second half
+	cudaError_t cudaStatus = histogramWithCuda(hist, &(myLargeArr[MY_ARR_SIZE / 2]), MY_ARR_SIZE/2, VALUES_RANGE);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "addWithCuda failed!");
 		return 1;

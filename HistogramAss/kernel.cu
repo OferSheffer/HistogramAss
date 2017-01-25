@@ -9,11 +9,9 @@
 #define CHKSYNC_ERROR	if (cudaStatus != cudaSuccess) { fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus); goto Error; }
 
 
-
-// 300,000 indices; 2,000 total threads; 2 blocks: 1,000 threads per block;
-// Each thread in charge of 150 contigeous indices
-#define THREAD_BLOCK_SIZE 150	
-#define NO_BLOCKS  2            
+// arrSize indices; THREADS_PER_BLOCK * NO_BLOCKS total threads;
+// Each thread in charge of THREAD_BLOCK_SIZE contigeous indices
+#define NO_BLOCKS  5       
 #define THREADS_PER_BLOCK 1000
 
 // Helper function for using CUDA to add vectors in parallel.
@@ -53,6 +51,14 @@ __global__ void sumThreadedResultsKernel(long *dev_hist, int *dev_threadedHist, 
 
 cudaError_t histogramWithCuda(long* hist, const int* largeArr, const int arrSize, const int histSize)
 {
+	if (arrSize % (THREADS_PER_BLOCK * NO_BLOCKS) != 0) {
+		fprintf(stderr, "histogramWithCuda launch failed:\n"
+			"Array size (%d) modulo Total threads (%d) != 0.\n"
+			"Try changing number of threads.\n", arrSize, (THREADS_PER_BLOCK * NO_BLOCKS));
+		goto Error;
+	}
+
+	const int THREAD_BLOCK_SIZE = arrSize / (THREADS_PER_BLOCK * NO_BLOCKS);
 	int  *dev_arr = 0;
 	long *dev_hist = 0;
 	int  *dev_threadedHist = 0;
@@ -69,7 +75,7 @@ cudaError_t histogramWithCuda(long* hist, const int* largeArr, const int arrSize
 		// Allocate GPU buffers
 		cudaStatus = cudaMalloc((void**)&dev_arr, arrSize * sizeof(int)); CHKMAL_ERROR;
 		cudaStatus = cudaMalloc((void**)&dev_hist, histSize * sizeof(long)); CHKMAL_ERROR;
-		cudaStatus = cudaMalloc((void**)&dev_threadedHist, THREADS_PER_BLOCK * NO_BLOCKS * histSize * sizeof(int)); CHKMAL_ERROR;    // each thread gets a "private" 
+		cudaStatus = cudaMalloc((void**)&dev_threadedHist, THREADS_PER_BLOCK * NO_BLOCKS * histSize * sizeof(int)); CHKMAL_ERROR;    // each thread gets a "private" histogram
 
 		// Copy input / memSet (Host to Device)
 		cudaStatus = cudaMemcpy(dev_arr, largeArr, arrSize * sizeof(int), cudaMemcpyHostToDevice); CHKMEMCPY_ERROR;
