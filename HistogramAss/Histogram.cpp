@@ -10,6 +10,7 @@
 #include "Histogram.h"
 
 #define MASTER 0
+#define SLAVE  1
 #define NO_OMP_THREADS 4		// OMP: 4 core laptop
 
 int main(int argc, char *argv[])
@@ -41,13 +42,19 @@ int main(int argc, char *argv[])
 			//largeArr[i] = 1;
 		myLargeArr = largeArr;
 
-	
-		// TODO send half the array to slave for calculations
-
+		// send half the array to slave for calculations
+		if (numprocs != 1)
+			MPI_Send(&(largeArr[MY_ARR_SIZE]), MY_ARR_SIZE, MPI_INT, SLAVE, 0, MPI_COMM_WORLD);
 
 	}
 	else  // *** SLAVE ***
 	{
+		// recv half the array to slave for calculations
+		int count;
+		MPI_Probe(MASTER, 0, MPI_COMM_WORLD, &status);
+		MPI_Get_count(&status, MPI_CHAR, &count);
+		myLargeArr = (int*)calloc(count, sizeof(int));
+		MPI_Recv(myLargeArr, MY_ARR_SIZE, MPI_INT, MASTER, 0, MPI_COMM_WORLD, &status);
 	}
 
 	// use openMP for first half
@@ -66,7 +73,7 @@ int main(int argc, char *argv[])
 			ompHistogram[i] += ompCounterArr[ix*VALUES_RANGE + i];					// threads aggregate histogram data for specific histogram values
 		}
 
-	printf("OMP Histogram sample = {%d,%d,%d,%d,%d}\n",
+	printf("%d OMP Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
 		ompHistogram[0], ompHistogram[1], ompHistogram[2], ompHistogram[3], ompHistogram[4]);
 
 
@@ -77,20 +84,28 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("Histogram sample = {%d,%d,%d,%d,%d}\n",
+	printf("%d Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
 		hist[0], hist[1], hist[2], hist[3], hist[4]);
 
 
 
 
-	// TODO receive results from slave
+	
+	if (myid == MASTER)
+	{
+		// TODO receive results from slave
 
 
-	// TODO combine results with openMP
+		// TODO combine results with openMP
 
 
-	// TODO display final histogram
+		// TODO display final histogram
 
+	}
+	else  // *** SLAVE ***
+	{
+		// TODO send results to master
+	}
 
 	free(myLargeArr);
 
@@ -101,7 +116,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "cudaDeviceReset failed!");
 		return 1;
 	}
-	
 
 	MPI_Finalize();
 	return 0;
