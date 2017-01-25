@@ -15,7 +15,7 @@
 
 int main(int argc, char *argv[])
 {
-	const int ARR_SIZE = 300000;
+	const int ARR_SIZE = 100000;
 	const int MY_ARR_SIZE = ARR_SIZE / 2;
 	const int VALUES_RANGE = 256;
 	int numprocs, myid;
@@ -44,8 +44,9 @@ int main(int argc, char *argv[])
 		srand(time(NULL));
 		for (long i = 0; i < ARR_SIZE; i++)
 			largeArr[i] = rand() % VALUES_RANGE;
-			//largeArr[i] = 1;
-		myLargeArr = largeArr;
+			//largeArr[i] = 1;   // alternative test value
+
+		myLargeArr = largeArr;	 // Master works with original array
 
 		// send half the array to slave for calculations
 		MPI_Send(&(largeArr[MY_ARR_SIZE]), MY_ARR_SIZE, MPI_INT, SLAVE, 0, MPI_COMM_WORLD);
@@ -73,10 +74,6 @@ int main(int argc, char *argv[])
 			ompHistogram[i] += ompCounterArr[ix*VALUES_RANGE + i];					// threads aggregate histogram data for specific histogram values
 		}
 
-	/*printf("%d OMP Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
-		ompHistogram[0], ompHistogram[1], ompHistogram[2], ompHistogram[3], ompHistogram[4]);
-	*/
-
 	// use CUDA for second half
 	cudaError_t cudaStatus = histogramWithCuda(hist, &(myLargeArr[MY_ARR_SIZE / 2]), MY_ARR_SIZE/2, VALUES_RANGE);
 	if (cudaStatus != cudaSuccess) {
@@ -84,35 +81,39 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	/*printf("%d Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
-		hist[0], hist[1], hist[2], hist[3], hist[4]);
-	*/
-
 	#pragma omp parallel for
 	for (int i = 0; i < VALUES_RANGE; ++i)
 	{
 		hist[i] += ompHistogram[i];					// threads aggregate local OMP & CUDA results
 	}
 
-	printf("%d Histogram aggregation sample = {%d,%d,%d,%d,%d}\n", myid,
-		hist[0], hist[1], hist[2], hist[3], hist[4]);
+	free(ompCounterArr);
+	free(ompHistogram);
 
-
-	
 	if (myid == MASTER)
 	{
-		// TODO receive results from slave
+		// receive results from slave
+		int* recvHist = (int*)calloc(VALUES_RANGE, sizeof(int));
+		MPI_Recv(recvHist, VALUES_RANGE, MPI_INT, SLAVE, 0, MPI_COMM_WORLD, &status);
 
+		// combine results with openMP
+		#pragma omp parallel for
+		for (int i = 0; i < VALUES_RANGE; ++i)
+		{
+			hist[i] += recvHist[i];					// threads aggregate local OMP & CUDA results
+		}
 
-		// TODO combine results with openMP
+		// display final histogram
+		printf("Histogram:\n");
+		for (int i = 0; i < VALUES_RANGE; i++)
+			printf("%d ", hist[i]);
+		printf("\n");
 
-
-		// TODO display final histogram
-
+		free(recvHist);
 	}
 	else  // *** SLAVE ***
 	{
-		// TODO send results to master
+		// send results to master
 		MPI_Send(hist, VALUES_RANGE, MPI_INT, MASTER, 0, MPI_COMM_WORLD);
 	}
 
