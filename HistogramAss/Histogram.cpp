@@ -55,10 +55,7 @@ int main(int argc, char *argv[])
 	int* ompHistogram = (int*)calloc(VALUES_RANGE, sizeof(int));
 	int* ompCounterArr = (int*)calloc(NO_OMP_THREADS * VALUES_RANGE, sizeof(int));   // each thread given pseudo-private VALUES_RANGE
 
-	double start_time = omp_get_wtime();	// omp performance test
-
-
-	#pragma omp parallel for 
+	#pragma omp parallel for
 	for (int i = 0; i < MY_ARR_SIZE/2; ++i)
 		ompCounterArr[omp_get_thread_num()*VALUES_RANGE + myLargeArr[i]]++;			// each thread collects histogram data
 
@@ -68,12 +65,6 @@ int main(int argc, char *argv[])
 		{
 			ompHistogram[i] += ompCounterArr[ix*VALUES_RANGE + i];					// threads aggregate histogram data for specific histogram values
 		}
-
-	double end_time = omp_get_wtime();	// omp performance test
-
-	printf("OMP Time %g\n", end_time - start_time);  // omp performance test 1: 6.3E-4
-
-
 
 	printf("OMP Histogram sample = {%d,%d,%d,%d,%d}\n",
 		ompHistogram[0], ompHistogram[1], ompHistogram[2], ompHistogram[3], ompHistogram[4]);
