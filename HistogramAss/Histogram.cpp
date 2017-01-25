@@ -29,6 +29,11 @@ int main(int argc, char *argv[])
 
 	MPI_Status status;
 
+	if (numprocs != 2) {
+		printf("Please run with %d processes.\n", 2); fflush(stdout);
+		MPI_Abort(MPI_COMM_WORLD, 1);
+	}
+
 	if (myid == MASTER)
 	{
 		//init MASTER variables
@@ -43,8 +48,7 @@ int main(int argc, char *argv[])
 		myLargeArr = largeArr;
 
 		// send half the array to slave for calculations
-		if (numprocs != 1)
-			MPI_Send(&(largeArr[MY_ARR_SIZE]), MY_ARR_SIZE, MPI_INT, SLAVE, 0, MPI_COMM_WORLD);
+		MPI_Send(&(largeArr[MY_ARR_SIZE]), MY_ARR_SIZE, MPI_INT, SLAVE, 0, MPI_COMM_WORLD);
 
 	}
 	else  // *** SLAVE ***
@@ -109,6 +113,7 @@ int main(int argc, char *argv[])
 	else  // *** SLAVE ***
 	{
 		// TODO send results to master
+		MPI_Send(hist, VALUES_RANGE, MPI_INT, MASTER, 0, MPI_COMM_WORLD);
 	}
 
 	free(myLargeArr);
