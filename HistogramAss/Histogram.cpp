@@ -69,9 +69,9 @@ int main(int argc, char *argv[])
 			ompHistogram[i] += ompCounterArr[ix*VALUES_RANGE + i];					// threads aggregate histogram data for specific histogram values
 		}
 
-	printf("%d OMP Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
+	/*printf("%d OMP Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
 		ompHistogram[0], ompHistogram[1], ompHistogram[2], ompHistogram[3], ompHistogram[4]);
-
+	*/
 
 	// use CUDA for second half
 	cudaError_t cudaStatus = histogramWithCuda(hist, &(myLargeArr[MY_ARR_SIZE / 2]), MY_ARR_SIZE/2, VALUES_RANGE);
@@ -80,13 +80,18 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("%d Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
+	/*printf("%d Histogram sample = {%d,%d,%d,%d,%d}\n", myid,
 		hist[0], hist[1], hist[2], hist[3], hist[4]);
+	*/
 
+	#pragma omp parallel for
+	for (int i = 0; i < VALUES_RANGE; ++i)
+	{
+		hist[i] += ompHistogram[i];					// threads aggregate local OMP & CUDA results
+	}
 
-	// aggregate local OMP & CUDA results
-
-
+	printf("%d Histogram aggregation sample = {%d,%d,%d,%d,%d}\n", myid,
+		hist[0], hist[1], hist[2], hist[3], hist[4]);
 
 
 	
