@@ -12,12 +12,12 @@
 #define MASTER 0
 #define SLAVE  1
 #define NO_OMP_THREADS 4		// OMP: 4 core laptop
+#define VALUES_RANGE   256
 
 int main(int argc, char *argv[])
 {
 	const int ARR_SIZE = 100000;
 	const int MY_ARR_SIZE = ARR_SIZE / 2;
-	const int VALUES_RANGE = 256;
 	int numprocs, myid;
 	long hist[VALUES_RANGE] = { 0 };
 	int* myLargeArr;
@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
 	if (myid == MASTER)
 	{
 		//init MASTER variables
-		
 		int* largeArr = (int*)calloc(ARR_SIZE, sizeof(int));
 
 		//init largeArr values:
